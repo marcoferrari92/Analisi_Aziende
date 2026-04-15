@@ -3,7 +3,7 @@ import pandas as pd
 import io
 
 # Importiamo le funzioni dal tuo file esterno utils.py
-from utils import render_database_misure, verifica_stato_clienti, colora_clienti, render_confronto_fondi
+from utils import render_database_misure, verifica_stato_clienti, colora_clienti, render_confronto_fondi, render_statistiche_budget
 
 # --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="RNA Business Intelligence", layout="wide")
@@ -122,6 +122,12 @@ if uploaded_file is not None:
             hide_index=True, use_container_width=True
         )
 
+        # B. Analisi Economica (LA TUA NUOVA FUNZIONE)
+        with st.expander(f"📊 Analisi Economica e Distribuzione {label_set_a}", expanded=True):
+            render_statistiche_budget(df_raw, label_set_a, kw_set_a)
+
+        st.divider()
+        
         # --- RICERCA AZIENDA E DETTAGLIO ---
         st.divider()
         st.subheader("🔍 Ricerca Dettagliata Azienda")
