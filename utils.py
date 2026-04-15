@@ -226,12 +226,12 @@ def render_confronto_fondi(df_rna, label_a, kw_a_raw, label_b, kw_b_raw):
     st.plotly_chart(fig, use_container_width=True)
 
     # 6. Tabella Opportunità (Lead Generation)
-    st.write(f"#### 🎯 Opportunità Prioritarie: Solo {label_a}")
-    st.info(f"Queste aziende hanno ottenuto {label_a} ma non risultano aver beneficiato di {label_b}.")
+    st.write(f"#### 🎯 Opportunità Prioritarie: Solo {label_b}")
+    st.info(f"Queste aziende hanno ottenuto {label_b} ma non risultano aver beneficiato di {label_a}.")
     
     lead_list = analisi_filtrata[
-        (analisi_filtrata['is_a'] == True) & 
-        (analisi_filtrata['is_b'] == False)
+        (analisi_filtrata['is_a'] == False) & 
+        (analisi_filtrata['is_b'] == True)
     ].sort_values(by='RNA_IMPORTO', ascending=False)
 
     st.dataframe(
