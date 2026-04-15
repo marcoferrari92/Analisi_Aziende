@@ -11,19 +11,21 @@ st.title("📊 Analizzatore Registro Nazionale Aiuti")
 st.markdown("Analisi strategica e qualificazione lead basata sui dati ufficiali RNA.")
 
 # --- SIDEBAR ---
-st.sidebar.header("1. Caricamento Dati")
-uploaded_file = st.sidebar.file_uploader("Carica file RNA", type=["csv"])
+st.sidebar.header("Configurazione Confronto Personalizzato")
 
-uploaded_clienti = st.sidebar.file_uploader("Carica Database Clienti (Opzionale)", type=["csv"])
+# Definiamo i nomi dei due gruppi da confrontare
+label_set_a = st.sidebar.text_input("Nome Set A", value="SABATINI", key="la")
+kw_set_a = st.sidebar.text_input(f"Keyword per {label_set_a}", value="SABATINI", key="ka")
 
-st.sidebar.header("2. Filtri Target")
-default_kw = "formazione, competenze, corso, training"
-keywords_raw = st.sidebar.text_area("Parole chiave target (separate da virgola)", value=default_kw)
+st.sidebar.divider()
+
+label_set_b = st.sidebar.text_input("Nome Set B", value="FORMAZIONE", key="lb")
+kw_set_b = st.sidebar.text_area(f"Keyword per {label_set_b} (separate da virgola)", value="formazione, competenze, corso", key="kb")
 
 # TASTO DI AGGIORNAMENTO
 btn_ricerca = st.sidebar.button("🔍 Aggiorna Analisi", use_container_width=True, type="primary")
 
-st.sidebar.header("3. Ordinamento Report")
+st.sidebar.header("Ordinamento Report")
 sort_options = {
     "Numero Aiuti Target": "N_AIUTI_TARGET",
     "Valore Aiuti Target (€)": "VALORE_TARGET_€",
