@@ -152,3 +152,106 @@ def colora_clienti(row):
     # Il codice HEX #d4edda è il classico verde "success"
     color = 'background-color: #d4edda' if "CLIENTE" in str(row['STATO']) else ''
     return [color] * len(row)
+
+
+
+
+
+
+def render_confronto_fondi(df_rna, label_a, kw_a_raw, label_b, kw_b_raw):
+    """
+    Esegue un confronto strategico tra due set di incentivi definiti dall'utente.
+    Utile per identificare opportunità di Cross-Selling.
+    """
+    st.subheader(f"🔄 Analisi Incrociata: {label_a} vs {label_b}")
+    st.markdown(f"""
+    In questa sezione analizziamo come si distribuiscono gli aiuti tra **{label_a}** e **{label_b}**.
+    L'obiettivo è individuare le aziende che hanno già investito in {label_a} ma non hanno ancora usufruito di {label_b}.
+    """)
+
+    # 1. Preparazione delle Regex per il filtraggio
+    def clean_kw(raw):
+        return '|'.join([k.strip().upper() for k in raw.split(',') if k.strip()])
+
+    regex_a = clean_kw(kw_a_raw)
+    regex_b = clean_kw(kw_b_raw)
+
+    df_temp = df_rna.copy()
+    
+    # 2. Identificazione delle righe appartenenti ai due Set
+    df_temp['is_a'] = df_temp['RNA_MISURA'].str.upper().str.contains(regex_a, na=False)
+    df_temp['is_b'] = df_temp['RNA_MISURA'].str.upper().str.contains(regex_b, na=False)
+
+    # 3. Aggregazione per Azienda
+    # Calcoliamo se l'azienda ha almeno un bando del Set A e/o del Set B
+    analisi = df_temp.groupby(['RAGIONE SOCIALE', 'STATO']).agg({
+        'is_a': 'any',
+        'is_b': 'any',
+        'RNA_IMPORTO': 'sum'
+    }).reset_index()
+
+    # 4. Definizione dei Profili Strategici
+    def definisci_profilo(row):
+        if row['is_a'] and row['is_b']:
+            return f"✅ Entrambi ({label_a} + {label_b})"
+        if row['is_a']:
+            return f"🚀 Solo {label_a} (Lead per {label_b})"
+        if row['is_b']:
+            return f"📚 Solo {label_b}"
+        return "Altro"
+
+    analisi['Profilo'] = analisi.apply(definisci_profilo, axis=1)
+    
+    # Filtriamo via le aziende che non appartengono a nessuno dei due set
+    analisi_filtrata = analisi[analisi['Profilo'] != "Altro"].copy()
+
+    if analisi_filtrata.empty:
+        st.warning(f"Nessuna azienda trovata con i parametri inseriti per {label_a} o {label_b}.")
+        return
+
+    # 5. Visualizzazione Grafica (Plotly)
+    st.write("#### Distribuzione dei segmenti")
+    conteggi = analisi_filtrata['Profilo'].value_counts().reset_index()
+    conteggi.columns = ['Profilo', 'Numero_Aziende']
+
+    fig = px.bar(
+        conteggi, 
+        x='Profilo', 
+        y='Numero_Aziende',
+        color='Profilo',
+        text_auto=True,
+        title=f"Segmentazione Aziende: {label_a} e {label_b}",
+        color_discrete_sequence=px.colors.qualitative.Pastel
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 6. Tabella Opportunità (Lead Generation)
+    st.write(f"#### 🎯 Opportunità Prioritarie: Solo {label_a}")
+    st.info(f"Queste aziende hanno ottenuto {label_a} ma non risultano aver beneficiato di {label_b}.")
+    
+    lead_list = analisi_filtrata[
+        (analisi_filtrata['is_a'] == True) & 
+        (analisi_filtrata['is_b'] == False)
+    ].sort_values(by='RNA_IMPORTO', ascending=False)
+
+    st.dataframe(
+        lead_list[['RAGIONE SOCIALE', 'STATO', 'RNA_IMPORTO']],
+        column_config={
+            "RNA_IMPORTO": st.column_config.NumberColumn("Budget Totale Aiuti (€)", format="%.2f €"),
+            "STATO": "Qualifica"
+        },
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # 7. Download dei Lead
+    csv_buffer = io.BytesIO()
+    lead_list.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
+    st.download_button(
+        label=f"📩 Scarica Lead {label_a} -> {label_b}",
+        data=csv_buffer.getvalue(),
+        file_name=f"Lead_{label_a}_vs_{label_b}.csv",
+        mime="text/csv"
+    )
+
+
