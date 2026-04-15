@@ -20,7 +20,7 @@ kw_set_a = st.sidebar.text_input(f"Keyword per {label_set_a}", value="formazione
 st.sidebar.divider()
 
 label_set_b = st.sidebar.text_input("Nome Set B", value="SABATINI", key="lb")
-kw_set_b = st.sidebar.text_area(f"Keyword per {label_set_b} (separate da virgola)", value="sabatini", key="kb")
+kw_set_b = st.sidebar.text_input(f"Keyword per {label_set_b}", value="formazione, competenze, corso", key="kb")
 
 # TASTO DI AGGIORNAMENTO
 btn_ricerca = st.sidebar.button("🔍 Aggiorna Analisi", use_container_width=True, type="primary")
