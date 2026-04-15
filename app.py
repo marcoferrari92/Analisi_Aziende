@@ -14,13 +14,13 @@ st.markdown("Analisi strategica e qualificazione lead basata sui dati ufficiali 
 st.sidebar.header("Configurazione Confronto Personalizzato")
 
 # Definiamo i nomi dei due gruppi da confrontare
-label_set_a = st.sidebar.text_input("Nome Set A", value="SABATINI", key="la")
-kw_set_a = st.sidebar.text_input(f"Keyword per {label_set_a}", value="SABATINI", key="ka")
+label_set_a = st.sidebar.text_input("Nome Set A", value="FORMAZIONE", key="la")
+kw_set_a = st.sidebar.text_input(f"Keyword per {label_set_a}", value="formazione, competenze, corso", key="ka")
 
 st.sidebar.divider()
 
-label_set_b = st.sidebar.text_input("Nome Set B", value="FORMAZIONE", key="lb")
-kw_set_b = st.sidebar.text_area(f"Keyword per {label_set_b} (separate da virgola)", value="formazione, competenze, corso", key="kb")
+label_set_b = st.sidebar.text_input("Nome Set B", value="SABATINI", key="lb")
+kw_set_b = st.sidebar.text_area(f"Keyword per {label_set_b} (separate da virgola)", value="sabatini", key="kb")
 
 # TASTO DI AGGIORNAMENTO
 btn_ricerca = st.sidebar.button("🔍 Aggiorna Analisi", use_container_width=True, type="primary")
