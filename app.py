@@ -11,6 +11,48 @@ st.set_page_config(page_title="RNA Business Intelligence", layout="wide")
 st.title("📊 Analizzatore Registro Nazionale Aiuti")
 st.markdown("Analisi strategica e qualificazione lead basata sui dati ufficiali RNA.")
 
+# --- FUNZIONE DI NORMALIZZAZIONE E PULIZIA ---
+def preprocess_dataframe(df):
+    """
+    Rileva le colonne fondamentali indipendentemente dal case (Maiuscole/Minuscole)
+    e rimuove quelle indesiderate.
+    """
+    # Mappa delle colonne che vogliamo "fissare"
+    mappa_standard = {
+        'RAGIONE SOCIALE': 'RAGIONE SOCIALE',
+        'CITTÀ': 'CITTÀ',
+        'CITTA': 'CITTÀ',
+        'CLASSIFICAZIONE': 'CLASSIFICAZIONE',
+        'N. DIPE': 'N. Dipe',
+        'CODICE ATECO': 'Codice ateco'
+    }
+    
+    rename_dict = {}
+    cols_to_drop = []
+
+    for col in df.columns:
+        col_clean = col.strip().upper()
+        
+        # 1. Identifichiamo colonne da ignorare o eliminare
+        if col_clean in ['RAGIONE SOCIALE EXT', 'N. DIPE CALC']:
+            cols_to_drop.append(col)
+            continue
+            
+        # 2. Mappiamo le colonne necessarie al formato standard dello script
+        if col_clean in mappa_standard:
+            rename_dict[col] = mappa_standard[col_clean]
+
+    # Eseguiamo pulizia e rinomina
+    df = df.drop(columns=cols_to_drop, errors='ignore')
+    df = df.rename(columns=rename_dict)
+    
+    # 3. Gestione duplicati per evitare crash nel set_index/groupby
+    if 'RAGIONE SOCIALE' in df.columns:
+        df['RAGIONE SOCIALE'] = df['RAGIONE SOCIALE'].astype(str).str.strip()
+        df = df.drop_duplicates(subset=['RAGIONE SOCIALE'], keep='first')
+        
+    return df
+
 # --- SIDEBAR ---
 st.sidebar.header("1. Caricamento Dati")
 uploaded_file = st.sidebar.file_uploader("Carica file RNA", type=["csv"])
@@ -19,7 +61,6 @@ uploaded_clienti = st.sidebar.file_uploader("Carica Database Clienti (Opzionale)
 st.sidebar.divider()
 
 st.sidebar.header("2. Configurazione Confronto Strategico")
-# Questi valori alimenteranno sia il filtro 'Target' del report che il confronto Set A vs Set B
 label_set_a = st.sidebar.text_input("Nome Set A", value="FORMAZIONE", key="la")
 kw_set_a = st.sidebar.text_area(f"Keyword per {label_set_a}", value="formazione, competenze, corso", key="ka")
 
@@ -44,9 +85,17 @@ if uploaded_file is not None:
     try:
         @st.cache_data
         def load_data(file):
-            return pd.read_csv(file, sep=';', encoding='utf-8-sig')
+            # sep=None con engine='python' indovina se il separatore è , o ;
+            df = pd.read_csv(file, sep=None, engine='python', encoding='utf-8-sig')
+            df = preprocess_dataframe(df)
+            return df
 
         df_raw = load_data(uploaded_file)
+
+        # Controllo di sicurezza
+        if 'RAGIONE SOCIALE' not in df_raw.columns:
+            st.error("❌ Impossibile trovare la colonna 'Ragione Sociale'. Controlla il file.")
+            st.stop()
 
         # --- LOGICA DI CONFRONTO CLIENTI ---
         if uploaded_clienti is not None:
@@ -57,7 +106,7 @@ if uploaded_file is not None:
         # Pulizia Importi
         df_raw['RNA_IMPORTO'] = pd.to_numeric(df_raw['RNA_IMPORTO'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
         
-        # --- FILTRO TARGET (Usiamo il Set A come Target principale del report) ---
+        # --- FILTRO TARGET ---
         keywords_target = [k.strip().upper() for k in kw_set_a.split(',')]
         
         def is_target_row(row_text):
@@ -67,17 +116,21 @@ if uploaded_file is not None:
         df_raw['is_target'] = df_raw['RNA_MISURA'].apply(is_target_row)
         df_raw['importo_target'] = df_raw.apply(lambda x: x['RNA_IMPORTO'] if x['is_target'] else 0, axis=1)
 
-        # --- GENERAZIONE REPORT SINTETICO ---
-        # Includiamo 'STATO' nell'aggregazione
-        report = df_raw.groupby('RAGIONE SOCIALE').agg({
+        # --- GENERAZIONE REPORT SINTETICO DINAMICO ---
+        agg_dict = {
             'RNA_MISURA': 'count',
             'RNA_IMPORTO': 'sum',
             'is_target': 'sum',
             'importo_target': 'sum',
-            'STATO': 'first',
-            'CITTÀ': 'first',
-            'CLASSIFICAZIONE': 'first'
-        }).reset_index().rename(columns={
+            'STATO': 'first'
+        }
+        
+        # Aggiungiamo colonne opzionali solo se esistono nel file dopo il preprocessing
+        for col_opt in ['CITTÀ', 'CLASSIFICAZIONE', 'N. Dipe', 'Codice ateco']:
+            if col_opt in df_raw.columns:
+                agg_dict[col_opt] = 'first'
+
+        report = df_raw.groupby('RAGIONE SOCIALE').agg(agg_dict).reset_index().rename(columns={
             'RNA_MISURA': 'N_TOT_AIUTI',
             'RNA_IMPORTO': 'VALORE_TOTALE_€',
             'is_target': 'N_AIUTI_TARGET',
@@ -122,13 +175,9 @@ if uploaded_file is not None:
             hide_index=True, use_container_width=True
         )
 
-        # B. Analisi Economica (LA TUA NUOVA FUNZIONE)
         with st.expander(f"📊 Analisi Economica e Distribuzione {label_set_a}", expanded=True):
             render_statistiche_budget(df_raw, label_set_a, kw_set_a)
 
-        st.divider()
-        
-        # --- RICERCA AZIENDA E DETTAGLIO ---
         st.divider()
         st.subheader("🔍 Ricerca Dettagliata Azienda")
         search_txt = st.text_input("Inserisci Ragione Sociale")
@@ -144,18 +193,12 @@ if uploaded_file is not None:
                 with c1:
                     st.metric("% Incidenza N.", f"{info_rank['INCIDENZA_N_TARGET_%']:.1f}%")
                     st.caption(f"🏆 Rank: **{info_rank['RANK_INC_N']}**")
-                    st.metric("% Incidenza Vol.", f"{info_rank['INCIDENZA_VOL_TARGET_%']:.1f}%")
-                    st.caption(f"🏆 Rank: **{info_rank['RANK_INC_VOL']}**")
                 with c2:
                     st.metric("Volume Totale", f"{info_rank['VALORE_TOTALE_€']:,.2f} €")
                     st.caption(f"🏆 Rank: **{info_rank['RANK_VOL_TOT']}**")
-                    st.metric("Volume Target", f"{info_rank['VALORE_TARGET_€']:,.2f} €")
-                    st.caption(f"🏆 Rank: **{info_rank['RANK_VOL_TARGET']}**")
                 with c3:
                     st.metric("Bandi Totali", int(info_rank['N_TOT_AIUTI']))
                     st.caption(f"🏆 Rank: **{info_rank['RANK_N_TOT']}**")
-                    st.metric("Bandi Target", int(info_rank['N_AIUTI_TARGET']))
-                    st.caption(f"🏆 Rank: **{info_rank['RANK_N_TARGET']}**")
 
                 st.dataframe(azienda_details[['RNA_DATA', 'RNA_MISURA', 'RNA_IMPORTO', 'is_target']], use_container_width=True)
 
