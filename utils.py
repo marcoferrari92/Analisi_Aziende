@@ -254,4 +254,63 @@ def render_confronto_fondi(df_rna, label_a, kw_a_raw, label_b, kw_b_raw):
         mime="text/csv"
     )
 
+def render_statistiche_budget(df_rna, label_a, kw_a_raw):
+    st.subheader(f"📊 Statistiche Budget: {label_a}")
+    
+    # 1. Preparazione dati e Regex
+    def clean_kw(raw):
+        return '|'.join([k.strip().upper() for k in raw.split(',') if k.strip()])
 
+    regex_a = clean_kw(kw_a_raw)
+    df_temp = df_rna.copy()
+    
+    # 2. Calcolo importi per riga
+    df_temp['is_a'] = df_temp['RNA_MISURA'].str.upper().str.contains(regex_a, na=False)
+    df_temp['importo_a'] = df_temp.apply(lambda x: x['RNA_IMPORTO'] if x['is_a'] else 0, axis=1)
+
+    # 3. Aggregazione per Azienda
+    stats_aziende = df_temp.groupby('RAGIONE SOCIALE').agg({
+        'RNA_IMPORTO': 'sum',
+        'importo_a': 'sum'
+    }).reset_index()
+    
+    # Filtriamo le aziende che hanno ricevuto almeno un bando del Set A
+    target_aziende = stats_aziende[stats_aziende['importo_a'] > 0].copy()
+    
+    if target_aziende.empty:
+        st.warning(f"Dati insufficienti per calcolare statistiche su {label_a}.")
+        return
+
+    # Calcolo Incidenza %
+    target_aziende['incidenza_%'] = (target_aziende['importo_a'] / target_aziende['RNA_IMPORTO']) * 100
+
+    # 4. Calcolo KPI
+    media_abs = target_aziende['importo_a'].mean()
+    mediana_abs = target_aziende['importo_a'].median()
+    media_perc = target_aziende['incidenza_%'].mean()
+    mediana_perc = target_aziende['incidenza_%'].median()
+
+    # 5. Visualizzazione Metriche
+    st.write(f"Analisi basata su **{len(target_aziende)}** aziende che hanno ricevuto {label_a}:")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric(f"Media Budget {label_a}", f"€ {media_abs:,.2f}")
+        st.metric(f"Incidenza Media %", f"{media_perc:.1f}%")
+        st.caption("La media risente dei grandi importi.")
+        
+    with c2:
+        st.metric(f"Mediana Budget {label_a}", f"€ {mediana_abs:,.2f}")
+        st.metric(f"Incidenza Mediana %", f"{mediana_perc:.1f}%")
+        st.caption("La mediana indica il valore centrale (più realistico).")
+
+    # 6. Grafico Distribuzione (opzionale ma utile)
+    fig_dist = px.histogram(
+        target_aziende, 
+        x='importo_a', 
+        nbins=30,
+        title=f"Distribuzione Budget {label_a}",
+        labels={'importo_a': 'Budget Erogato (€)'},
+        color_discrete_sequence=['#2ecc71']
+    )
+    st.plotly_chart(fig_dist, use_container_width=True)
