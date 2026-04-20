@@ -3,7 +3,7 @@ import pandas as pd
 import io
 
 # Importiamo le funzioni dal tuo file esterno utils.py
-from utils import render_database_misure, verifica_stato_clienti, colora_clienti, render_confronto_fondi, render_statistiche_budget
+from utils import render_database_misure, verifica_stato_clienti, colora_clienti, render_statistiche_budget
 
 # --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="RNA Business Intelligence", layout="wide")
