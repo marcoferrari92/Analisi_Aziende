@@ -81,7 +81,6 @@ sort_options = {
 sort_choice = st.sidebar.selectbox("Ordina tabella per:", list(sort_options.keys()), index=0)
 
 # --- LOGICA DI ELABORAZIONE ---
-# --- LOGICA DI ELABORAZIONE ---
 if uploaded_file is not None:
     try:
         @st.cache_data
@@ -144,11 +143,11 @@ if uploaded_file is not None:
         report = report.sort_values(by=sort_options[sort_choice], ascending=False)
 
         # --- VISUALIZZAZIONE ---
-        render_database_misure(df_raw)
+        #render_database_misure(df_raw)
         
-        st.divider()
-        with st.expander(f"🎯 Strategia Commerciale: {label_set_a} vs {label_set_b}", expanded=True):
-            render_confronto_fondi(df_raw, label_set_a, kw_set_a, label_set_b, kw_set_b)
+        #st.divider()
+        #with st.expander(f"🎯 Strategia Commerciale: {label_set_a} vs {label_set_b}", expanded=True):
+            #render_confronto_fondi(df_raw, label_set_a, kw_set_a, label_set_b, kw_set_b)
 
         st.divider()
         st.subheader(f"📋 Analisi Target: Focus su {label_set_a}")
