@@ -81,23 +81,18 @@ sort_options = {
 sort_choice = st.sidebar.selectbox("Ordina tabella per:", list(sort_options.keys()), index=0)
 
 # --- LOGICA DI ELABORAZIONE ---
+# --- LOGICA DI ELABORAZIONE ---
 if uploaded_file is not None:
     try:
         @st.cache_data
         def load_data(file):
-            # sep=None con engine='python' indovina se il separatore è , o ;
             df = pd.read_csv(file, sep=None, engine='python', encoding='utf-8-sig')
             df = preprocess_dataframe(df)
             return df
 
-        df_raw = load_data(uploaded_file)
+        df_raw = load_data(uploaded_file).copy() # Uso copy() per sicurezza
 
-        # Controllo di sicurezza
-        if 'RAGIONE SOCIALE' not in df_raw.columns:
-            st.error("❌ Impossibile trovare la colonna 'Ragione Sociale'. Controlla il file.")
-            st.stop()
-
-        # --- LOGICA DI CONFRONTO CLIENTI ---
+        # --- GESTIONE CLIENTI ---
         if uploaded_clienti is not None:
             df_raw = verifica_stato_clienti(df_raw, uploaded_clienti)
         else:
@@ -106,17 +101,18 @@ if uploaded_file is not None:
         # Pulizia Importi
         df_raw['RNA_IMPORTO'] = pd.to_numeric(df_raw['RNA_IMPORTO'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
         
-        # --- FILTRO TARGET ---
-        keywords_target = [k.strip().upper() for k in kw_set_a.split(',')]
+        # --- FILTRO TARGET (SET A) ---
+        # Pulizia keyword: trasformo in lista e rimuovo spazi
+        keywords_target = [k.strip().upper() for k in kw_set_a.split(',') if k.strip()]
         
-        def is_target_row(row_text):
-            text = str(row_text).upper()
-            return any(k in text for k in keywords_target)
-
-        df_raw['is_target'] = df_raw['RNA_MISURA'].apply(is_target_row)
+        # Applichiamo il flag target una sola volta qui
+        df_raw['is_target'] = df_raw['RNA_MISURA'].str.upper().apply(lambda x: any(k in str(x) for k in keywords_target))
         df_raw['importo_target'] = df_raw.apply(lambda x: x['RNA_IMPORTO'] if x['is_target'] else 0, axis=1)
 
-        # --- GENERAZIONE REPORT SINTETICO DINAMICO ---
+        # --- GENERAZIONE REPORT SINTETICO ---
+        # Definiamo le colonne extra disponibili
+        colonne_extra = [c for c in ['CITTÀ', 'CLASSIFICAZIONE', 'N. Dipe', 'Codice ateco'] if c in df_raw.columns]
+        
         agg_dict = {
             'RNA_MISURA': 'count',
             'RNA_IMPORTO': 'sum',
@@ -124,13 +120,12 @@ if uploaded_file is not None:
             'importo_target': 'sum',
             'STATO': 'first'
         }
-        
-        # Aggiungiamo colonne opzionali solo se esistono nel file dopo il preprocessing
-        for col_opt in ['CITTÀ', 'CLASSIFICAZIONE', 'N. Dipe', 'Codice ateco']:
-            if col_opt in df_raw.columns:
-                agg_dict[col_opt] = 'first'
+        for c in colonne_extra: agg_dict[c] = 'first'
 
-        report = df_raw.groupby('RAGIONE SOCIALE').agg(agg_dict).reset_index().rename(columns={
+        report = df_raw.groupby('RAGIONE SOCIALE').agg(agg_dict).reset_index()
+        
+        # Rinomina per chiarezza
+        report = report.rename(columns={
             'RNA_MISURA': 'N_TOT_AIUTI',
             'RNA_IMPORTO': 'VALORE_TOTALE_€',
             'is_target': 'N_AIUTI_TARGET',
